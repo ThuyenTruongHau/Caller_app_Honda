@@ -4,28 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
+import com.example.honda_caller_app.data.api.Node
+import com.example.honda_caller_app.data.api.RetrofitManager
+import com.example.honda_caller_app.data.local.TokenManager
+import com.example.honda_caller_app.data.repository.AuthRepository
+import com.example.honda_caller_app.data.repository.NodeRepository
+import com.example.honda_caller_app.ui.home.HomeScreen
+import com.example.honda_caller_app.ui.login.LoginScreen
+import com.example.honda_caller_app.ui.login.LoginViewModel
 import com.example.honda_caller_app.ui.theme.Honda_Caller_AppTheme
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import com.example.honda_caller_app.ui.home.HomeViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,61 +26,58 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Honda_Caller_AppTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    GetLayout(
-                        "Trang chủ",
-                        innerPadding
-                    )
-                }
+                HondaCallerApp()
             }
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun GetLayout(title: String = "Caller", innerPadding: PaddingValues = PaddingValues(0.dp)) {
-
-    var count by rememberSaveable {
-        mutableIntStateOf( 0)
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        GetTextTitle(count.toString(), innerPadding)
-        Button(onClick = {
-            count++
-        }) {
-            Text(text = "Click me")
+fun HondaCallerApp() {
+    val context = LocalContext.current
+    
+    // Initialize dependencies
+    val tokenManager = remember { TokenManager(context) }
+    val authRepository = remember { AuthRepository(RetrofitManager.apiService, tokenManager) }
+    val nodeRepository = remember { NodeRepository(RetrofitManager.apiService) }
+    val loginViewModel = remember { LoginViewModel(authRepository) }
+    val homeViewModel = remember { HomeViewModel(nodeRepository) }
+    
+    // Check if already logged in
+    var isLoggedIn by remember { mutableStateOf(tokenManager.isLoggedIn()) }
+    var username by remember { mutableStateOf(tokenManager.getUsername()) }
+    
+    // Tự động lấy nodes khi đã đăng nhập
+    LaunchedEffect(key1 = isLoggedIn, key2 = username) {
+        if (isLoggedIn && username?.isNotEmpty() == true) {
+            // Gọi API để lấy nodes qua HomeViewModel
+            homeViewModel.fetchNodesIfNeeded(username!!)
         }
-
     }
-}
-
-@Composable
-fun GetTextTitle(title: String = "Caller", innerPadding: PaddingValues = PaddingValues(0.dp)) {
-    Text(
-        text = title,
-        modifier = Modifier.padding(innerPadding).fillMaxWidth(),
-        fontSize = 30.sp,
-        color = Color.Red,
-        textAlign = TextAlign.Center,
-    )
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-//@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Honda_Caller_AppTheme {
-        Greeting("Android")
+    
+    if (isLoggedIn) {
+        HomeScreen(
+            username = username,
+            supplyNodes = homeViewModel.supplyNodes,
+            returnsNodes = homeViewModel.returnsNodes,
+            bothNodes = homeViewModel.bothNodes,
+            onLogout = {
+                authRepository.logout()
+                isLoggedIn = false
+                username = ""
+                loginViewModel.resetLoginState()
+                homeViewModel.resetState()
+            },
+            onNodeClick = { node -> homeViewModel.sendNodeCommand(node) },
+            viewModel = homeViewModel
+        )
+    } else {
+        LoginScreen(
+            onLoginSuccess = {
+                isLoggedIn = true
+                username = tokenManager.getUsername()
+            },
+            viewModel = loginViewModel
+        )
     }
 }
