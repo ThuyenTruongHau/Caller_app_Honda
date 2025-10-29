@@ -21,22 +21,18 @@ interface ApiService {
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     
     /**
-     * Lấy danh sách nodes theo owner và node type
+     * Lấy danh sách nodes theo owner (advanced API)
      * @param owner Username của người dùng
-     * @param nodeType Loại node: supply, returns, both
-     * @return Response chứa danh sách nodes
+     * @return Response chứa AdvancedNodesResponse với pt_nodes và vl_nodes
      */
-    @GET("nodes/owner/{owner}/{node_type}")
-    suspend fun getNodesByOwnerAndType(
-        @Path("owner") owner: String,
-        @Path("node_type") nodeType: String
-    ): Response<List<Node>>
+    @GET("nodes/advanced/{owner}")
+    suspend fun getAdvancedNodes(
+        @Path("owner") owner: String
+    ): Response<AdvancedNodesResponse>
 
     /**
-     * Lấy danh sách nodes theo owner và node type
-     * @param owner Username của người dùng
-     * @param nodeType Loại node: supply, returns, both
-     * @return Response chứa danh sách nodes
+     * Gửi lệnh lên RCS
+     * @return Response kết quả gửi lệnh và payload gửi lên
      */
     @POST("caller/process-caller")
     suspend fun sendRcsCommand(@Body request: Payload): Response<JsonElement>
@@ -77,36 +73,52 @@ data class UserInfo(
     val last_login: String? = null
 )
 
-/**
- * Node List Response model
- */
-data class NodeListResponse(
-    val nodes: List<Node>
-)
-
-/**
- * Node model
- */
-data class Node(
-    val id: String,
-    val node_name: String,
-    val node_type: String,
-    val owner: String,
-    val start: Int,
-    val end: Int,
-    val next_start: Int,
-    val next_end: Int,
-    val created_at: String,
-    val updated_at: String
-)
-
 data class Payload(
     val node_name: String,
     val node_type: String,
     val owner: String,
+    val process_code: String,
     val start: Int,
     val end: Int,
     val next_start: Int,
     val next_end: Int,
+    val line: String
 )
+
+/**
+ * Response từ API nodes/advanced/{owner}
+ */
+data class AdvancedNodesResponse(
+    val pt_nodes: NodesByType,
+    val vl_nodes: NodesByType
+)
+
+/**
+ * Nodes được nhóm theo node type (supply, returns, both, auto)
+ * Key: node type (supply, returns, both, auto...)
+ * Value: Map với Key là line name (Line A, Line B...) và Value là danh sách nodes
+ */
+typealias NodesByType = Map<String, Map<String, List<NodeOut>>>
+
+/**
+ * NodeOut model - một node trả về từ API
+ */
+data class NodeOut(
+    val node_name: String,
+    val node_type: String,
+    val owner: String,
+    val process_code: String,
+    val start: Int,
+    val end: Int,
+    val next_start: Int,
+    val next_end: Int,
+    val line: String,
+    val created_at: String? = null,
+    val updated_at: String? = null
+)
+
+/**
+ * Type alias để tương thích với code hiện tại
+ */
+typealias Node = NodeOut
 
