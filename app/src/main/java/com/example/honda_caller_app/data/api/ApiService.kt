@@ -66,9 +66,9 @@ data class UserInfo(
     val is_superuser: Boolean,
     val permissions: List<String>,
     val roles: List<String>,
-    val supply: String? = null,
-    val returns: String? = null,
-    val both: String? = null,
+    val area: Int? = null,
+    val group_id: Int? = null,
+    val route: List<String>? = null,
     val created_at: String? = null,
     val last_login: String? = null
 )

@@ -271,16 +271,18 @@ fun LoginScreen(
             }
 
             // Phần tử khác ở dưới
-            // Video chiếm 50% chiều cao
+            // Ảnh solu1.jpg
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(), // ✅ chỉ chiếm 70%
+                    .fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
-                VideoPlayer(
-                    videoUri = "android.resource://com.example.honda_caller_app/${R.raw.video_robotarm}",
-                    modifier = Modifier.matchParentSize()
+                Image(
+                    painter = painterResource(R.drawable.tool_tracking),
+                    contentDescription = "Solu1",
+                    modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Fit
                 )
             }
         }

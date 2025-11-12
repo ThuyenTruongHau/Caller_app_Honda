@@ -24,9 +24,9 @@ class TokenManager(context: Context) {
         private const val KEY_PERMISSIONS = "permissions"
         private const val KEY_IS_ACTIVE = "is_active"
         private const val KEY_IS_SUPERUSER = "is_superuser"
-        private const val KEY_SUPPLY = "supply"
-        private const val KEY_RETURNS = "returns"
-        private const val KEY_BOTH = "both"
+        private const val KEY_AREA = "area"
+        private const val KEY_GROUP_ID = "group_id"
+        private const val KEY_ROUTE = "route"
         private const val KEY_CREATED_AT = "created_at"
         private const val KEY_LAST_LOGIN = "last_login"
     }
@@ -69,9 +69,9 @@ class TokenManager(context: Context) {
         permissions: List<String>? = null,
         isActive: Boolean? = null,
         isSuperuser: Boolean? = null,
-        supply: String? = null,
-        returns: String? = null,
-        both: String? = null,
+        area: Int? = null,
+        group_id: Int? = null,
+        route: List<String>? = null,
         createdAt: String? = null,
         lastLogin: String? = null
     ) {
@@ -82,9 +82,9 @@ class TokenManager(context: Context) {
             .putStringSet(KEY_PERMISSIONS, permissions?.toSet())
             .putBoolean(KEY_IS_ACTIVE, isActive ?: false)
             .putBoolean(KEY_IS_SUPERUSER, isSuperuser ?: false)
-            .putString(KEY_SUPPLY, supply)
-            .putString(KEY_RETURNS, returns)
-            .putString(KEY_BOTH, both)
+            .putString(KEY_AREA, area.toString())
+            .putString(KEY_GROUP_ID, group_id.toString())
+            .putStringSet(KEY_ROUTE, route?.toSet())
             .putString(KEY_CREATED_AT, createdAt)
             .putString(KEY_LAST_LOGIN, lastLogin)
             .apply()
@@ -147,24 +147,24 @@ class TokenManager(context: Context) {
     }
     
     /**
-     * Lấy supply
+     * Lấy area
      */
-    fun getSupply(): String? {
-        return prefs.getString(KEY_SUPPLY, null)
+    fun getArea(): String? {
+        return prefs.getString(KEY_AREA, null)
     }
     
     /**
-     * Lấy returns
+     * Lấy group
      */
-    fun getReturns(): String? {
-        return prefs.getString(KEY_RETURNS, null)
+    fun getGroupId(): String? {
+        return prefs.getString(KEY_GROUP_ID, null)
     }
     
     /**
-     * Lấy both
+     * Lấy route
      */
-    fun getBoth(): String? {
-        return prefs.getString(KEY_BOTH, null)
+    fun getRoute(): Set<String>? {
+        return prefs.getStringSet(KEY_ROUTE, null)
     }
     
     /**
@@ -194,9 +194,9 @@ class TokenManager(context: Context) {
             .remove(KEY_PERMISSIONS)
             .remove(KEY_IS_ACTIVE)
             .remove(KEY_IS_SUPERUSER)
-            .remove(KEY_SUPPLY)
-            .remove(KEY_RETURNS)
-            .remove(KEY_BOTH)
+            .remove(KEY_AREA)
+            .remove(KEY_GROUP_ID)
+            .remove(KEY_ROUTE)
             .remove(KEY_CREATED_AT)
             .remove(KEY_LAST_LOGIN)
             .putBoolean(KEY_IS_LOGGED_IN, false)

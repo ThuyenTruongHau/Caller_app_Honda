@@ -48,9 +48,9 @@ class AuthRepository(
                                 permissions = loginResponse.user.permissions,
                                 isActive = loginResponse.user.is_active,
                                 isSuperuser = loginResponse.user.is_superuser,
-                                supply = loginResponse.user.supply,
-                                returns = loginResponse.user.returns,
-                                both = loginResponse.user.both,
+                                area = loginResponse.user.area,
+                                group_id = loginResponse.user.group_id,
+                                route = loginResponse.user.route,
                                 createdAt = loginResponse.user.created_at,
                                 lastLogin = loginResponse.user.last_login
                             )
