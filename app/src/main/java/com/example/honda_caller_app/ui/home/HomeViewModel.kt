@@ -12,183 +12,147 @@ import com.example.honda_caller_app.data.api.AdvancedNodesResponse
 import com.example.honda_caller_app.data.network.NetworkResult
 import com.example.honda_caller_app.data.repository.NodeRepository
 import com.example.honda_caller_app.data.repository.SocketRepository
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.google.gson.JsonSyntaxException
-import com.google.gson.JsonElement
-import kotlinx.coroutines.launch 
+import com.google.gson.*
+import kotlinx.coroutines.launch
+import android.util.Log
 
+// ==============================
+// DATA CLASS
+// ==============================
+data class NotificationItem(
+    val id: String = System.currentTimeMillis().toString(),
+    val title: String,
+    val message: String,
+    val timestamp: String?,
+    val type: String?,
+    val status: String?,
+    val priority: String?,
+    val jsonData: JsonObject?
+)
+
+// ==============================
+// VIEWMODEL
+// ==============================
 class HomeViewModel(
     private val nodeRepository: NodeRepository,
     private val webSocketRepository: SocketRepository? = null
 ) : ViewModel() {
-    
-    // State để lưu danh sách nodes theo từng loại (giữ để tương thích UI)
+
+    // ---- Nodes ----
     var supplyNodes by mutableStateOf<List<Node>>(emptyList())
         private set
-    
     var returnsNodes by mutableStateOf<List<Node>>(emptyList())
         private set
-    
     var bothNodes by mutableStateOf<List<Node>>(emptyList())
         private set
-    
-    // State mới để lưu AdvancedNodesResponse
+
     var advancedNodesResponse by mutableStateOf<AdvancedNodesResponse?>(null)
         private set
-    
-    // State để lưu auto nodes theo từng line
+
     var autoNodesByLine by mutableStateOf<Map<String, List<NodeOut>>>(emptyMap())
         private set
-    
-    // State để lưu manual return nodes theo từng line
     var manualReturnNodeByLine by mutableStateOf<Map<String, List<NodeOut>>>(emptyMap())
         private set
-    
-    // Danh sách tên các line có sẵn trong nodeAuto (để biết có những line nào)
+
     var availableLineNames by mutableStateOf<List<String>>(emptyList())
         private set
-
     var availableLineForVLManual by mutableStateOf<List<String>>(emptyList())
         private set
-    
-    // State để track việc gửi command
+
     var isSendingCommand by mutableStateOf(false)
         private set
-    
-    var commandResult by mutableStateOf<String>("")
+    var commandResult by mutableStateOf("")
         private set
-    
-    var commandData by mutableStateOf<com.google.gson.JsonElement?>(null)
+    var commandData by mutableStateOf<JsonElement?>(null)
         private set
-
     var showResultDialog by mutableStateOf(false)
         private set
-    
-    // Flag để track đã fetch nodes chưa
+
     private var nodesFetched = false
 
-    // State để lưu JSON message từ WebSocket (lưu JsonObject để có thể truy cập các trường động)
-    var notificationJson by mutableStateOf<JsonObject?>(null)
+    // =====================================================
+    //               NOTIFICATION STORAGE
+    // =====================================================
+    var notifications by mutableStateOf<List<NotificationItem>>(emptyList())   // lịch sử
         private set
 
-    // State để lưu thông báo đã format để hiển thị
-    var notificationTitle by mutableStateOf<String?>(null)
-        private set
+    private val notificationQueue = mutableListOf<NotificationItem>()           // HÀNG ĐỢI
+    private val MAX_QUEUE = 50
 
-    var notificationText by mutableStateOf<String?>(null)
+    var currentNotification by mutableStateOf<NotificationItem?>(null)
         private set
 
     var showNotification by mutableStateOf(false)
         private set
 
+    // Các trường cũ giữ để HomeScreen không lỗi
+    var notificationJson by mutableStateOf<JsonObject?>(null)
+        private set
+    var notificationTitle by mutableStateOf<String?>(null)
+        private set
+    var notificationText by mutableStateOf<String?>(null)
+        private set
+    var notificationType by mutableStateOf<String?>(null)
+        private set
+    var notificationTimestamp by mutableStateOf<String?>(null)
+        private set
+    var notificationStatus by mutableStateOf<String?>(null)
+        private set
+    var notificationPriority by mutableStateOf<String?>(null)
+        private set
+
+    // =====================================================
+    //                      INIT
+    // =====================================================
     init {
-        // Collect messages từ WebSocket nếu có repository
-        webSocketRepository?.let { repository ->
+        webSocketRepository?.let { repo ->
             viewModelScope.launch {
-                repository.messages.collect { rawMessage ->
-                    handleWebSocketMessage(rawMessage)
+                repo.messages.collect { raw ->
+                    handleWebSocketMessage(raw)
                 }
             }
         }
     }
-    
-    /**
-     * Gọi các API để lấy nodes theo từng loại
-     */
-    private suspend fun fetchAllNodes(owner: String) {
-        // Gọi advanced API mới
-        when (val result = nodeRepository.getAdvancedNodes(owner)) {
-            is NetworkResult.Success -> {
-                advancedNodesResponse = result.data
-                
-                // Gán biến nodeAuto từ vl_nodes["auto"] với xử lý exception
-                val node = result.data
-                val nodeAuto = node.vl_nodes["auto"] // nodeAuto có kiểu Map<String, List<NodeOut>>?
-                val nodeManualReturn = node.vl_nodes["returns"] // nodeManualReturn có kiểu Map<String, List<NodeOut>>?
-                val supplyNodes = node.pt_nodes["supply"]
-                val returnsNodes = node.pt_nodes["returns"]
-                val bothNodes = node.pt_nodes["both"]
-                
-                // Xử lý trường hợp không có node "auto" và lấy nodes theo từng line
-                // nodeAuto là Map<String, List<NodeOut>> với key là tên line (ví dụ: "Line 1", "Line 2", "Line 3")
-                autoNodesByLine = nodeAuto ?: emptyMap()
-                manualReturnNodeByLine = nodeManualReturn ?: emptyMap()
-                
-                // Lấy danh sách tên các line có sẵn (để biết có những line nào)
-                availableLineNames = autoNodesByLine.keys.sorted() // Sắp xếp để dễ đọc
-                availableLineForVLManual = manualReturnNodeByLine.keys.sorted()
 
+    // =====================================================
+    //                    FUNCTIONS
+    // =====================================================
 
-            }
-            is NetworkResult.Error -> {
-                // Xử lý lỗi nếu cần
-                advancedNodesResponse = null
-            }
-            is NetworkResult.Loading -> {
-                // Loading state
-            }
-        }
-    }
-    
-    /**
-     * Lấy nodes của một line cụ thể từ nodeAuto
-     * @param lineName Tên line (ví dụ: "Line 1", "Line 2", "Line 3")
-     * @return Danh sách NodeOut của line đó, hoặc emptyList() nếu không tìm thấy
-     */
-    fun getNodesByLine(lineName: String): List<NodeOut> {
-        return autoNodesByLine[lineName] ?: emptyList()
-    }
-
-    fun getManualNodesReturn(lineName: String): List<NodeOut> {
-        return manualReturnNodeByLine[lineName] ?: emptyList()
-    }
-    
-    /**
-     * Lấy manual return nodes của một line cụ thể từ vl_nodes["returns"]
-     * @param lineName Tên line (ví dụ: "Line 1", "Line 2", "Line 3")
-     * @return Danh sách NodeOut của line đó, hoặc emptyList() nếu không tìm thấy
-     */
-    fun getManualReturnNodesByLine(lineName: String): List<NodeOut> {
-        return manualReturnNodeByLine[lineName] ?: emptyList()
-    }
-    
-    /**
-     * Kiểm tra xem một line có tồn tại trong nodeAuto không
-     * @param lineName Tên line cần kiểm tra
-     * @return true nếu line tồn tại, false nếu không
-     */
-    fun hasLine(lineName: String): Boolean {
-        return autoNodesByLine.containsKey(lineName)
-    }
-    
-    /**
-     * Lấy tất cả nodes của tất cả các line (flatten thành một list)
-     * @return Danh sách tất cả NodeOut từ tất cả các line
-     */
-    fun getAllAutoNodes(): List<NodeOut> {
-        return autoNodesByLine.values.flatten()
-    }
-    
-    /**
-     * Gọi API lấy nodes nếu chưa có (cho trường hợp đã đăng nhập từ trước)
-     */
     suspend fun fetchNodesIfNeeded(owner: String) {
-        // Chỉ gọi API nếu chưa fetch
         if (!nodesFetched) {
             fetchAllNodes(owner)
             nodesFetched = true
         }
     }
-    
-    /**
-     * Gửi lệnh RCS khi click vào node
-     */
+
+    private suspend fun fetchAllNodes(owner: String) {
+        when (val result = nodeRepository.getAdvancedNodes(owner)) {
+            is NetworkResult.Success -> {
+                advancedNodesResponse = result.data
+                val node = result.data
+
+                autoNodesByLine = node.vl_nodes["auto"] ?: emptyMap()
+                manualReturnNodeByLine = node.vl_nodes["returns"] ?: emptyMap()
+
+                availableLineNames = autoNodesByLine.keys.sorted()
+                availableLineForVLManual = manualReturnNodeByLine.keys.sorted()
+            }
+            is NetworkResult.Error -> advancedNodesResponse = null
+            else -> {}
+        }
+    }
+
+    fun getNodesByLine(lineName: String): List<NodeOut> =
+        autoNodesByLine[lineName] ?: emptyList()
+
+    fun getManualNodesReturn(lineName: String): List<NodeOut> =
+        manualReturnNodeByLine[lineName] ?: emptyList()
+
     fun sendNodeCommand(node: Node) {
         isSendingCommand = true
         commandResult = ""
         commandData = null
-        
+
         viewModelScope.launch {
             val payload = Payload(
                 node_name = node.node_name,
@@ -201,22 +165,20 @@ class HomeViewModel(
                 next_end = node.next_end,
                 line = node.line
             )
-            
+
             when (val result = nodeRepository.sendRcsCommand(payload)) {
                 is NetworkResult.Success -> {
                     isSendingCommand = false
                     commandResult = "Thành công"
-                    commandData = result.data  // Lưu data trả về
-                    showResultDialog = true  // Hiển thị dialog
+                    commandData = result.data
+                    showResultDialog = true
                 }
                 is NetworkResult.Error -> {
                     isSendingCommand = false
                     commandResult = result.message
-                    showResultDialog = true  // Hiển thị dialog lỗi
+                    showResultDialog = true
                 }
-                is NetworkResult.Loading -> {
-                    // Loading state
-                }
+                else -> {}
             }
         }
     }
@@ -225,130 +187,161 @@ class HomeViewModel(
         showResultDialog = false
     }
 
-    /**
-     * Extension function để lấy String từ JsonObject một cách an toàn
-     * Tránh conflict với Kotlin extension function yêu cầu API 26
-     * ĐẶT TRƯỚC CLASS HomeViewModel
-     */
-    private fun JsonObject.optString(key: String): String? {
-        return if (this.has(key) && !this.get(key).isJsonNull) {
-            val element: JsonElement = this.get(key)
-            if (element.isJsonPrimitive) {
-                element.asJsonPrimitive.asString
-            } else {
-                null
-            }
+
+    // =====================================================
+    //              NOTIFICATION QUEUE HANDLING
+    // =====================================================
+
+    private fun enqueueNotification(item: NotificationItem) {
+        // Chỉ hiển thị notification có type = "notification"
+        if (item.type != "notification") {
+            return  // Không thêm vào queue, không hiển thị
         } else {
-            null
+            // Lưu lịch sử (luôn lưu tất cả)
+            notifications = listOf(item) + notifications
+
+            if (notificationQueue.size >= MAX_QUEUE) notificationQueue.removeAt(0)
+            notificationQueue.add(item)
+
+            // Nếu chưa hiển thị gì → bật luôn cái đầu
+            if (currentNotification == null && !showNotification) {
+                showNextFromQueue()
+            }
         }
     }
 
-    /**
-     * Xử lý message từ WebSocket - Parse JSON động
-     * @param rawMessage JSON string từ WebSocket
-     */
-    private fun handleWebSocketMessage(rawMessage: String) {
+    private fun showNextFromQueue() {
+        if (notificationQueue.isEmpty()) {
+            dismissNotification()
+            return
+        }
+
+        val next = notificationQueue.removeAt(0)
+        currentNotification = next
+        notificationJson = next.jsonData
+        notificationTitle = next.title
+        notificationText = next.message
+        notificationTimestamp = next.timestamp
+        notificationType = next.type
+        notificationStatus = next.status
+        notificationPriority = next.priority
+
+        showNotification = true
+    }
+
+    fun onNotificationDismissed() {
+        showNotification = false
+        currentNotification = null
+
+        // Thêm delay 1 giây trước khi show thông báo tiếp theo
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(20L)
+            showNextFromQueue()
+        }
+    }
+
+    fun resumeNotificationQueue() {
+        if (currentNotification == null && notificationQueue.isNotEmpty()) {
+            showNextFromQueue()
+        }
+    }
+
+    // =====================================================
+    //                  WEBSOCKET PROCESSING
+    // =====================================================
+
+    private fun JsonObject.optString(key: String): String? {
+        return if (this.has(key) && !this.get(key).isJsonNull)
+            this.get(key).asString
+        else null
+    }
+
+    private fun handleWebSocketMessage(raw: String) {
         try {
-            // Parse JSON thành JsonObject (không cần data model)
-            val jsonObject: JsonObject = JsonParser().parse(rawMessage).asJsonObject
+            val parsed = JsonParser().parse(raw)
 
-            // Lưu JsonObject để có thể truy cập các trường sau này
-            notificationJson = jsonObject
+            if (parsed.isJsonObject) {
+                val obj = parsed.asJsonObject
 
-            // Extract các trường một cách động - Dùng extension function optString
-            val message = jsonObject.optString("message")
-                ?: jsonObject.optString("content")
-                ?: jsonObject.optString("text")
-                ?: jsonObject.optString("msg")
-                ?: rawMessage
+                val message = obj.optString("alarm_code")
+                    ?: obj.optString("message")
+                    ?: raw
 
-            val title = jsonObject.optString("title")
-                ?: jsonObject.optString("subject")
-                ?: jsonObject.optString("type")
-                ?: "Thông báo"
+                val title = obj.optString("device_name")
+                    ?: obj.optString("title")
+                    ?: "Thông báo"
 
-            // Lấy type nếu có
-            val type = jsonObject.optString("type")
+                val type = obj.optString("type")
+                val timestamp = obj.optString("alarm_date")
+                val status = obj.optString("alarm_status")
+                val priority = obj.optString("alarm_grade")
 
-            // Log tất cả các trường có trong JSON để debug
-            jsonObject.keySet().forEach { key ->
-                val element: JsonElement = jsonObject.get(key)
+                val item = NotificationItem(
+                    title = title,
+                    message = message,
+                    timestamp = timestamp,
+                    type = type,
+                    status = status,
+                    priority = priority,
+                    jsonData = obj
+                )
+
+                enqueueNotification(item)
+                return
             }
 
+            // Không phải JSON object
+            enqueueNotification(
+                NotificationItem(
+                    title = "Thông báo",
+                    message = raw,
+                    timestamp = null,
+                    type = null,
+                    status = null,
+                    priority = null,
+                    jsonData = null
+                )
+            )
 
-            // Cập nhật state để hiển thị
-            notificationTitle = title
-            notificationText = message
-            showNotification = true
-
-        } catch (e: JsonSyntaxException) {
-            // Nếu không parse được JSON, hiển thị raw message
-            // Set notificationJson = null vì không parse được
-            notificationJson = null
-
-            // Hiển thị raw message như một thông báo đơn giản
-            notificationTitle = "Thông báo"
-            notificationText = rawMessage
-            showNotification = true
         } catch (e: Exception) {
-            // Set notificationJson = null vì không parse được
-            notificationJson = null
-
-            // Hiển thị raw message như một thông báo đơn giản
-            notificationTitle = "Thông báo"
-            notificationText = rawMessage
-            showNotification = true
+            enqueueNotification(
+                NotificationItem(
+                    title = "Thông báo",
+                    message = raw,
+                    timestamp = null,
+                    type = null,
+                    status = null,
+                    priority = null,
+                    jsonData = null
+                )
+            )
         }
     }
 
-    /**
-     * Lấy giá trị của một trường bất kỳ từ JSON message
-     * @param key Tên trường cần lấy
-     * @return Giá trị của trường dưới dạng String, hoặc null nếu không tồn tại
-     */
-    fun getNotificationField(key: String): String? {
-        return notificationJson?.get(key)?.asString
-    }
 
-    /**
-     * Lấy giá trị của một trường bất kỳ từ JSON message (dạng số)
-     * @param key Tên trường cần lấy
-     * @return Giá trị của trường dưới dạng Int, hoặc null nếu không tồn tại
-     */
-    fun getNotificationFieldInt(key: String): Int? {
-        return notificationJson?.get(key)?.asInt
-    }
-
-    /**
-     * Kiểm tra xem JSON message có chứa trường nào không
-     * @param key Tên trường cần kiểm tra
-     * @return true nếu có, false nếu không
-     */
-    fun hasNotificationField(key: String): Boolean {
-        return notificationJson?.has(key) == true
-    }
-
-    /**
-     * Lấy toàn bộ JSON message dưới dạng string (để hiển thị chi tiết)
-     * @return JSON string, hoặc null nếu không có
-     */
-    fun getNotificationJsonString(): String? {
-        return notificationJson?.toString()
-    }
-
-    /**
-     * Ẩn thông báo
-     */
+    // =====================================================
+    //              API DÙNG BỞI UI CŨ
+    // =====================================================
     fun dismissNotification() {
         showNotification = false
+        currentNotification = null
         notificationJson = null
         notificationTitle = null
         notificationText = null
+        notificationType = null
+        notificationTimestamp = null
+        notificationStatus = null
+        notificationPriority = null
     }
 
-    /**
-     * Reset state khi logout
-     */
+    fun clearAllNotifications() {
+        notifications = emptyList()
+    }
+
+    fun removeNotification(notificationId: String) {
+        notifications = notifications.filter { it.id != notificationId }
+    }
+
     fun resetState() {
         supplyNodes = emptyList()
         returnsNodes = emptyList()
@@ -359,14 +352,19 @@ class HomeViewModel(
         availableLineNames = emptyList()
         availableLineForVLManual = emptyList()
         nodesFetched = false
-        isSendingCommand = false
-        commandResult = ""
-        commandData = null
-        showResultDialog = false
+
+        // Reset notification
+        notifications = emptyList()
+        notificationQueue.clear()
+        currentNotification = null
         showNotification = false
+
         notificationJson = null
         notificationTitle = null
         notificationText = null
+        notificationType = null
+        notificationTimestamp = null
+        notificationStatus = null
+        notificationPriority = null
     }
-
 }

@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-10-23T08:31:27.153784700Z">
+        <DropdownSelection timestamp="2025-11-21T08:54:09.331642800Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\sha256\.android\avd\Zebra_ET45.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\sha256\.android\avd\Zebra_ET45_2.avd" />
             </handle>
           </Target>
         </DropdownSelection>

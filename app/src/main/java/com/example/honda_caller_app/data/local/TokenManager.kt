@@ -26,7 +26,7 @@ class TokenManager(context: Context) {
         private const val KEY_IS_SUPERUSER = "is_superuser"
         private const val KEY_AREA = "area"
         private const val KEY_GROUP_ID = "group_id"
-        private const val KEY_ROUTE = "route"
+        private const val KEY_ROUTE_ID = "route"
         private const val KEY_CREATED_AT = "created_at"
         private const val KEY_LAST_LOGIN = "last_login"
     }
@@ -71,7 +71,7 @@ class TokenManager(context: Context) {
         isSuperuser: Boolean? = null,
         area: Int? = null,
         group_id: Int? = null,
-        route: List<String>? = null,
+        route_id: Int? = null,
         createdAt: String? = null,
         lastLogin: String? = null
     ) {
@@ -84,7 +84,7 @@ class TokenManager(context: Context) {
             .putBoolean(KEY_IS_SUPERUSER, isSuperuser ?: false)
             .putString(KEY_AREA, area.toString())
             .putString(KEY_GROUP_ID, group_id.toString())
-            .putStringSet(KEY_ROUTE, route?.toSet())
+            .putString(KEY_ROUTE_ID, route_id.toString())
             .putString(KEY_CREATED_AT, createdAt)
             .putString(KEY_LAST_LOGIN, lastLogin)
             .apply()
@@ -161,10 +161,10 @@ class TokenManager(context: Context) {
     }
     
     /**
-     * Lấy route
+     * Lấy route_id
      */
-    fun getRoute(): Set<String>? {
-        return prefs.getStringSet(KEY_ROUTE, null)
+    fun getRouteId(): String? {
+        return prefs.getString(KEY_ROUTE_ID, null)
     }
     
     /**
@@ -196,7 +196,7 @@ class TokenManager(context: Context) {
             .remove(KEY_IS_SUPERUSER)
             .remove(KEY_AREA)
             .remove(KEY_GROUP_ID)
-            .remove(KEY_ROUTE)
+            .remove(KEY_ROUTE_ID)
             .remove(KEY_CREATED_AT)
             .remove(KEY_LAST_LOGIN)
             .putBoolean(KEY_IS_LOGGED_IN, false)

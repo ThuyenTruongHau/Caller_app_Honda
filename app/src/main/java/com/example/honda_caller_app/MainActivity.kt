@@ -21,6 +21,7 @@ import com.example.honda_caller_app.ui.theme.Honda_Caller_AppTheme
 import com.example.honda_caller_app.ui.home.HomeViewModel
 import com.example.honda_caller_app.data.network.WebSocketManager
 import com.example.honda_caller_app.data.repository.SocketRepository
+import android.util.Log
 
 
 class MainActivity : ComponentActivity() {
@@ -48,7 +49,7 @@ fun HondaCallerApp() {
     // Check if already logged in
     var isLoggedIn by remember { mutableStateOf(tokenManager.isLoggedIn()) }
     var username by remember { mutableStateOf(tokenManager.getUsername()) }
-    var route by remember { mutableStateOf(tokenManager.getRoute()) }
+    var route_id by remember { mutableStateOf(tokenManager.getRouteId()) }
     val TasksManager = remember {
         WebSocketManager(
             client = RetrofitManager.okHttpClient // hoặc RetrofitManager.okHttpClient
@@ -63,6 +64,7 @@ fun HondaCallerApp() {
             webSocketRepository = webSocketRepository // Truyền repository vào ViewModel
         )
     }
+    var viewModelKey by remember { mutableStateOf(0) }
     
     // Tự động lấy nodes khi đã đăng nhập
     LaunchedEffect(key1 = isLoggedIn, key2 = username) {
@@ -75,12 +77,24 @@ fun HondaCallerApp() {
     LaunchedEffect(key1 = isLoggedIn) {
         if (isLoggedIn) {
             // Đọc trực tiếp từ tokenManager mỗi lần LaunchedEffect chạy
-            val groupId = tokenManager.getGroupId()
-            if (groupId != null && groupId.isNotEmpty()) {
-                TasksManager.connect("notification/$groupId")
+            Log.d("MainActivity", "Attempting to connect WebSocket...")
+            Log.d("MainActivity", "Route: $route_id")
+            println("MainActivity: Attempting to connect WebSocket...")
+            println("MainActivity: Route: $route_id")
+            
+            if (route_id != null) {
+                val path = "route/$route_id"
+                Log.d("MainActivity", "Connecting to WebSocket with path: $path")
+                println("MainActivity: Connecting to WebSocket with path: $path")
+                TasksManager.connect(path)
+            } else {
+                Log.w("MainActivity", "Group ID is null or empty, cannot connect WebSocket")
+                println("WARNING: Group ID is null or empty, cannot connect WebSocket")
             }
         } else {
             // Ngắt kết nối nếu đã logout
+            Log.d("MainActivity", "User logged out, disconnecting WebSocket")
+            println("MainActivity: User logged out, disconnecting WebSocket")
             TasksManager.disconnect()
         }
     }
@@ -107,7 +121,7 @@ fun HondaCallerApp() {
             onLoginSuccess = {
                 isLoggedIn = true
                 username = tokenManager.getUsername()
-                route = tokenManager.getRoute()
+                route_id = tokenManager.getRouteId()
             },
             viewModel = loginViewModel
         )

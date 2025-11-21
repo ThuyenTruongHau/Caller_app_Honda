@@ -50,7 +50,7 @@ class AuthRepository(
                                 isSuperuser = loginResponse.user.is_superuser,
                                 area = loginResponse.user.area,
                                 group_id = loginResponse.user.group_id,
-                                route = loginResponse.user.route,
+                                route_id = loginResponse.user.route_id,
                                 createdAt = loginResponse.user.created_at,
                                 lastLogin = loginResponse.user.last_login
                             )

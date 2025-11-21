@@ -68,7 +68,7 @@ data class UserInfo(
     val roles: List<String>,
     val area: Int? = null,
     val group_id: Int? = null,
-    val route: List<String>? = null,
+    val route_id: Int? = null,
     val created_at: String? = null,
     val last_login: String? = null
 )
